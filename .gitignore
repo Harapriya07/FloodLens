@@ -11,3 +11,10 @@ data/processed/
 .env
 .env.*
 !.env.example
+
+# Model checkpoints
+*.pth
+
+# Generated evaluation visualizations
+/error_analysis.png
+/prediction_comparison.png

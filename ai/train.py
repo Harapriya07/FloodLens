@@ -1,30 +1,37 @@
+
+import argparse
 import torch
 from torch.utils.data import DataLoader
 
 from ai.dataset import FloodDataset
 from ai.unet import UNet
 from ai.losses import CombinedLoss
+from ai.reproducibility import set_seed
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    set_seed(args.seed)
+
     device = torch.device("cpu")
     print("Using device:", device)
 
-    # Datasets
-    train_dataset = FloodDataset(
-        root_dir="data/raw/Sen1Floods11",
-        split="train"
-    )
+    root_dir = "data/raw/Sen1Floods11"
 
-    val_dataset = FloodDataset(
-        root_dir="data/raw/Sen1Floods11",
-        split="valid"
-    )
+    train_dataset = FloodDataset(root_dir=root_dir, split="train")
+    val_dataset = FloodDataset(root_dir=root_dir, split="valid")
+
+    generator = torch.Generator()
+    generator.manual_seed(args.seed)
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=2,
-        shuffle=True
+        shuffle=True,
+        generator=generator
     )
 
     val_loader = DataLoader(
@@ -33,7 +40,6 @@ def main():
         shuffle=False
     )
 
-    # Model, loss and optimizer
     model = UNet().to(device)
     criterion = CombinedLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -41,8 +47,9 @@ def main():
     epochs = 5
     best_val_loss = float("inf")
 
+    checkpoint_path = f"best_unet_seed_{args.seed}.pth"
+
     for epoch in range(epochs):
-        # Training
         model.train()
         train_loss = 0.0
 
@@ -63,7 +70,6 @@ def main():
 
         train_loss /= len(train_loader)
 
-        # Validation
         model.eval()
         val_loss = 0.0
 
@@ -86,16 +92,13 @@ def main():
             f"Validation Loss: {val_loss:.4f}"
         )
 
-        # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
 
-            torch.save(
-                model.state_dict(),
-                "best_unet.pth"
-            )
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"Checkpoint saved: {checkpoint_path}")
 
-            print("Best model checkpoint saved.")
+    print(f"\nBest validation loss: {best_val_loss:.4f}")
 
 
 if __name__ == "__main__":
